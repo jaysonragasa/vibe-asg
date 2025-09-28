@@ -101,6 +101,49 @@
         const ENEMY_TURN_SPEED = 180; // degrees per second
         const ENEMY_AVOID_DIST = 80; // how far ahead the enemy looks to avoid asteroids
 
+        // --- Sound Effect URLs ---
+        const EXPLOSION_SOUND_URL = 'https://github.com/jaysonragasa/vibe-asg/raw/refs/heads/main/nuclear-explosion-386181.mp3';
+        const SHOOT_SOUND_URL = 'https://github.com/jaysonragasa/vibe-asg/raw/refs/heads/main/meaty-gunshot-101257.mp3';
+
+
+        // --- Sound Effects Setup ---
+        // Create an audio pool for explosion sounds to allow for simultaneous plays
+        const EXPLOSION_SOUND_POOL_SIZE = 10;
+        const explosionSoundPool = [];
+        for (let i = 0; i < EXPLOSION_SOUND_POOL_SIZE; i++) {
+            const sound = new Audio(EXPLOSION_SOUND_URL);
+            sound.volume = 0.3; // Lowered volume slightly to avoid clipping
+            explosionSoundPool.push(sound);
+        }
+        let explosionSoundIndex = 0;
+
+        // Create an audio pool for shooting sounds
+        const SHOOT_SOUND_POOL_SIZE = 10;
+        const shootSoundPool = [];
+        for (let i = 0; i < SHOOT_SOUND_POOL_SIZE; i++) {
+            shootSoundPool.push(new Audio(SHOOT_SOUND_URL));
+        }
+        let shootSoundIndex = 0;
+
+        function playExplosionSound() {
+            const sound = explosionSoundPool[explosionSoundIndex];
+            sound.currentTime = 0;
+            sound.play().catch(error => {
+                console.log("Audio play failed: ", error);
+            });
+            explosionSoundIndex = (explosionSoundIndex + 1) % EXPLOSION_SOUND_POOL_SIZE;
+        }
+
+        function playShootSound(isEnemy = false) {
+            const sound = shootSoundPool[shootSoundIndex];
+            sound.currentTime = 0;
+            sound.volume = isEnemy ? 0.25 : 0.5; // Enemy shots are 50% volume of player's
+            sound.play().catch(error => {
+                console.log("Audio play failed: ", error);
+            });
+            shootSoundIndex = (shootSoundIndex + 1) % SHOOT_SOUND_POOL_SIZE;
+        }
+
 
         let ship, asteroids, bullets, stars, powerups, particles, shockwaves, enemies, enemyBullets;
         let score = 0;
@@ -278,6 +321,7 @@
         }
 
         function fireEnemyBullet(enemy) {
+            playShootSound(true); // Play enemy shoot sound
             const angle = enemy.a; // Fire in the direction the enemy is facing
             enemyBullets.push({
                 x: enemy.x + enemy.r * 1.5 * Math.cos(angle), 
@@ -322,6 +366,7 @@
         }
 
         function shootBullet() {
+            playShootSound(); // Play player shoot sound
             if (ship.powerup === 'double') {
                 const angle = 10 / 180 * Math.PI;
                 fireBullet(ship.a - angle);
@@ -380,14 +425,14 @@
         }
         
         function destroyAllAsteroids() {
+            if (asteroids.length > 0) triggerScreenShake(30, 20); // One big shake for the bomb
             asteroids.forEach(roid => {
+                playExplosionSound();
                 createExplosion(roid.x, roid.y, roid.size);
+                shockwaves.push({ x: roid.x, y: roid.y, radius: roid.r / 2, maxRadius: roid.r * 2.5, alpha: 1.0, lineWidth: 5 });
                 score += roid.level * 10;
             });
             asteroids = [];
-            if (!isLevelingUp) {
-                setTimeout(createAsteroidBelt, 2000);
-            }
             updateUI();
         }
 
@@ -455,6 +500,7 @@
                 if (!bullets[i]) continue;
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     if (distBetweenPoints(bullets[i].x, bullets[i].y, enemies[j].x, enemies[j].y) < bullets[i].r + enemies[j].r) {
+                        playExplosionSound();
                         createExplosion(enemies[j].x, enemies[j].y, 50);
                         score += 50;
                         enemies.splice(j, 1);
@@ -469,6 +515,7 @@
                 for (let i = enemies.length - 1; i >= 0; i--) {
                     let e = enemies[i];
                     if (distBetweenPoints(ship.x, ship.y, e.x, e.y) < ship.r + e.r) {
+                        playExplosionSound();
                         createExplosion(e.x, e.y, 50);
                         enemies.splice(i, 1);
                         if (!ship.shielded) shipHit();
@@ -480,6 +527,7 @@
             for (let i = asteroids.length - 1; i >= 0; i--) {
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     if (distBetweenPoints(asteroids[i].x, asteroids[i].y, enemies[j].x, enemies[j].y) < asteroids[i].r + enemies[j].r) {
+                        playExplosionSound();
                         createExplosion(enemies[j].x, enemies[j].y, 50);
                         enemies.splice(j, 1);
                         break;
@@ -506,6 +554,8 @@
         }
 
         function destroyAsteroid(index) {
+            playExplosionSound();
+
             let roid = asteroids[index];
             createExplosion(roid.x, roid.y, roid.size);
             shockwaves.push({ x: roid.x, y: roid.y, radius: roid.r / 2, maxRadius: roid.r * 2.5, alpha: 1.0, lineWidth: 5 });
@@ -959,6 +1009,4 @@
     </script>
 </body>
 </html>
-
-
 
